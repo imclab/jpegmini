@@ -1,0 +1,15 @@
+{
+  "name": "jpegmini",
+  "version": "0.1.0",
+  "description": "A wrapper for the command line tool jpegmini",
+  "main": "index.js",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/sydneystockholm/jpegmini"
+  },
+  "keywords": [
+    "jpegmini"
+  ],
+  "author": "Sydney Stockholm <opensource@sydneystockholm.com>",
+  "license": "MIT"
+}
