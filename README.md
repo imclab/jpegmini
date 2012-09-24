@@ -19,7 +19,7 @@ jpegmini.process({
   , quality: jpegmini.BEST
   , skip_compressed: true
   , remove_metadata: false
-  , license_cache: '/etc/jpegmini_cache'
+  , license_cache: '/var/tmp/jpegmini_cache'
 }, function (err) {
     //..
 });
