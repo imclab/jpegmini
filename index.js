@@ -4,17 +4,27 @@ exports.MEDIUM = 2;
 exports.HIGH = 1;
 exports.BEST = 0;
 
-function jpegmini(options, callback) {
-    var args = Object.keys(options).map(function (key) {
+function optionString(options) {
+    return Object.keys(options).map(function (key) {
         var value = options[key];
-        if (typeof value === 'number') {
+        if (value == null) {
+            return '-' + key;
+        } else if (typeof value === 'number') {
             value += '';
         } else if (typeof value === 'string') {
             value = '"' + value.replace(/"/g, '\\"') + '"';
         }
         return '-' + key + '=' + value.replace(/`/g, '');
     }).join(' ');
-    exec('jpegmini ' + args, callback);
+}
+
+function jpegmini(options, callback) {
+    exec('jpegmini ' + optionString(options), callback);
+}
+
+function exiftool(options, path, callback) {
+    path = '"' + path.replace(/"/g, '\\"').replace(/`/g, '') + '"';
+    exec('exiftool ' + optionString(options) + ' ' + path, callback);
 }
 
 exports.process = function (options, callback) {
@@ -57,12 +67,25 @@ exports.process = function (options, callback) {
 };
 
 exports.logout = function (cache, callback) {
-    //Jpegmini requires a -f option, even if we just want to logout the license
+    //Jpegmini requires a -f option even if we just want to logout the license
     jpegmini({ lc_logout: cache, f: '/tmp/_.jpg' }, function (err) {
         if (err.message.indexOf('7032') !== -1) {
             err = null;
         }
         callback(err);
     });
+};
+
+exports.getOptimisedFlag = function (path, callback) {
+    exiftool({ 'comment': null }, path, function (err, comment) {
+        if (err) {
+            return callback(err);
+        }
+        callback(null, (comment || '').toLowerCase().indexOf('jpegmini') !== -1);
+    });
+};
+
+exports.setOptimisedFlag = function (path, callback) {
+    exiftool({ 'comment': 'Optimized by JPEGmini' }, path, callback);
 };
 

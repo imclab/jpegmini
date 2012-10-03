@@ -2,6 +2,8 @@
 
 ## Installation
 
+Requires that [jpegmini](http://www.jpegmini.com) and [exiftool](http://owl.phy.queensu.ca/~phil/exiftool/) are available in `PATH`
+
 ```bash
 $ npm install jpegmini
 ```
