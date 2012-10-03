@@ -11,6 +11,12 @@ jpegmini.HIGH = 1;
 jpegmini.BEST = 0;
 
 /**
+ * Manage concurrency.
+ */
+
+jpegmini.concurrency = 1;
+
+/**
  * Optimise an image.
  *
  * @param {String} path
@@ -94,7 +100,7 @@ jpegmini.process = function (options, callback) {
     if (options.remove_metadata) {
         cli.rmt = 1;
     }
-    exec_jpegmini(cli, callback);
+    jpegmini.exec(cli, callback);
 };
 
 /**
@@ -106,11 +112,13 @@ jpegmini.process = function (options, callback) {
 
 jpegmini.logout = function (cache_path, callback) {
     //Jpegmini requires a -f option even if we just want to logout the license
-    exec_jpegmini({ lc_logout: cache_path, f: '/tmp/_.jpg' }, function (err) {
+    jpegmini.exec({ lc_logout: cache_path, f: '/tmp/_.jpg' }, function (err) {
         if (err.message.indexOf('7032') !== -1) {
             err = null;
         }
-        callback && callback(err);
+        if (callback) {
+            callback(err);
+        }
     });
 };
 
@@ -127,7 +135,7 @@ jpegmini.logout = function (cache_path, callback) {
  */
 
 jpegmini.getOptimisedFlag = function (path, callback) {
-    exec_exiftool({ 'comment': null }, path, function (err, comment) {
+    jpegmini.exiftool({ 'comment': null }, path, function (err, comment) {
         if (err) {
             return callback(err);
         }
@@ -143,25 +151,25 @@ jpegmini.getOptimisedFlag = function (path, callback) {
  */
 
 jpegmini.setOptimisedFlag = function (path, callback) {
-    exec_exiftool({ 'comment': 'Optimized by JPEGmini' }, path, callback);
+    jpegmini.exiftool({ 'comment': 'Optimized by JPEGmini' }, path, callback);
 };
 
 /**
  * Execute the jpegmini binary.
  */
 
-function exec_jpegmini(options, callback) {
+jpegmini.exec = function (options, callback) {
     exec('jpegmini ' + optionString(options), callback);
-}
+};
 
 /**
  * Execute the exiftool binary.
  */
 
-function exec_exiftool(options, path, callback) {
+jpegmini.exiftool = function (options, path, callback) {
     path = '"' + path.replace(/"/g, '\\"').replace(/`/g, '') + '"';
     exec('exiftool ' + optionString(options) + ' ' + path, callback);
-}
+};
 
 /**
  * Convert an options object to a string.
@@ -192,4 +200,34 @@ function randomString() {
     }
     return str;
 }
+
+/**
+ * Manage concurrency.
+ */
+
+var queued = [], pending = 0
+  , jpegmini_exec = jpegmini.exec;
+
+jpegmini.exec = function () {
+    var args = Array.prototype.slice.call(arguments)
+      , scope = this;
+    if (pending >= jpegmini.concurrency) {
+        return queued.push({ args: args, scope: scope });
+    }
+    var callback = args.pop();
+    args.push(function () {
+        var args = Array.prototype.slice.call(arguments);
+        process.nextTick(function () {
+            callback.apply(this, args);
+            pending--;
+            while (pending < jpegmini.concurrency && queued.length) {
+                var next = queued.shift();
+                pending++;
+                jpegmini_exec.apply(next.scope, next.args);
+            }
+        });
+    });
+    pending++;
+    jpegmini_exec.apply(this, args);
+};
 
