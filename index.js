@@ -1,33 +1,64 @@
-var exec = require('child_process').exec;
+var exec = require('child_process').exec
+  , fs = require('fs')
+  , jpegmini = exports;
 
-exports.MEDIUM = 2;
-exports.HIGH = 1;
-exports.BEST = 0;
+/**
+ * Quality constants.
+ */
 
-function optionString(options) {
-    return Object.keys(options).map(function (key) {
-        var value = options[key];
-        if (value == null) {
-            return '-' + key;
-        } else if (typeof value === 'number') {
-            value += '';
-        } else if (typeof value === 'string') {
-            value = '"' + value.replace(/"/g, '\\"') + '"';
+jpegmini.MEDIUM = 2;
+jpegmini.HIGH = 1;
+jpegmini.BEST = 0;
+
+/**
+ * Optimise an image.
+ *
+ * @param {String} path
+ * @param {Object} options (optional) - see `jpegmini.process()`
+ * @param {Function} callback
+ */
+
+jpegmini.optimise = function (path, options, callback) {
+    if (typeof options === 'function') {
+        callback = options;
+        options = {};
+    }
+    jpegmini.getOptimisedFlag(path, function (err, optimised) {
+        if (err) {
+            return callback(err);
+        } else if (optimised) {
+            return callback();
         }
-        return '-' + key + '=' + value.replace(/`/g, '');
-    }).join(' ');
-}
+        options.input = path;
+        options.tmp_dir = (options.tmp_dir || '/tmp').replace(/\/$/g, '');
+        options.output = options.tmp_dir + '/' + randomString() + '.jpg';
+        jpegmini.process(options, function (err) {
+            if (err) {
+                return callback(err);
+            }
+            jpegmini.setOptimisedFlag(options.output, function (err) {
+                if (err) {
+                    return callback(err);
+                }
+                fs.rename(options.output, path, function (err) {
+                    if (err) {
+                        return callback(err);
+                    }
+                    callback(null, true);
+                });
+            });
+        });
+    });
+};
 
-function jpegmini(options, callback) {
-    exec('jpegmini ' + optionString(options), callback);
-}
+/**
+ * Process an image.
+ *
+ * @param {Object} options
+ * @param {Function} callback
+ */
 
-function exiftool(options, path, callback) {
-    path = '"' + path.replace(/"/g, '\\"').replace(/`/g, '') + '"';
-    exec('exiftool ' + optionString(options) + ' ' + path, callback);
-}
-
-exports.process = function (options, callback) {
+jpegmini.process = function (options, callback) {
     var cli = {};
     if (options.input) {
         cli.f = options.input;
@@ -47,10 +78,10 @@ exports.process = function (options, callback) {
         cli.rsz = options.resize;
     }
     switch (options.quality) {
-        case exports.MEDIUM:
+        case jpegmini.MEDIUM:
             cli.qual = 2;
             break;
-        case exports.HIGH:
+        case jpegmini.HIGH:
             cli.qual = 1;
             break;
         default:
@@ -63,21 +94,40 @@ exports.process = function (options, callback) {
     if (options.remove_metadata) {
         cli.rmt = 1;
     }
-    jpegmini(cli, callback);
+    exec_jpegmini(cli, callback);
 };
 
-exports.logout = function (cache, callback) {
+/**
+ * Logout a jpegmini license cache.
+ *
+ * @param {String} cache_path
+ * @param {Function} callback (optional)
+ */
+
+jpegmini.logout = function (cache_path, callback) {
     //Jpegmini requires a -f option even if we just want to logout the license
-    jpegmini({ lc_logout: cache, f: '/tmp/_.jpg' }, function (err) {
+    exec_jpegmini({ lc_logout: cache_path, f: '/tmp/_.jpg' }, function (err) {
         if (err.message.indexOf('7032') !== -1) {
             err = null;
         }
-        callback(err);
+        callback && callback(err);
     });
 };
 
-exports.getOptimisedFlag = function (path, callback) {
-    exiftool({ 'comment': null }, path, function (err, comment) {
+/**
+ * Check whether the image has been optimised by jpegmini.
+ *
+ * The jpegmini app (mac) uses the jpeg comment field to check whether
+ * the image has been processed already. The jpegmini server binary does
+ * not exhibit the same behaviour but may in a future release. Until that
+ * time we use exiftool to set the comment
+ *
+ * @param {String} path
+ * @param {Function} callback
+ */
+
+jpegmini.getOptimisedFlag = function (path, callback) {
+    exec_exiftool({ 'comment': null }, path, function (err, comment) {
         if (err) {
             return callback(err);
         }
@@ -85,7 +135,61 @@ exports.getOptimisedFlag = function (path, callback) {
     });
 };
 
-exports.setOptimisedFlag = function (path, callback) {
-    exiftool({ 'comment': 'Optimized by JPEGmini' }, path, callback);
+/**
+ * Set the optimisation flag.
+ *
+ * @param {String} path
+ * @param {Function} callback
+ */
+
+jpegmini.setOptimisedFlag = function (path, callback) {
+    exec_exiftool({ 'comment': 'Optimized by JPEGmini' }, path, callback);
 };
+
+/**
+ * Execute the jpegmini binary.
+ */
+
+function exec_jpegmini(options, callback) {
+    exec('jpegmini ' + optionString(options), callback);
+}
+
+/**
+ * Execute the exiftool binary.
+ */
+
+function exec_exiftool(options, path, callback) {
+    path = '"' + path.replace(/"/g, '\\"').replace(/`/g, '') + '"';
+    exec('exiftool ' + optionString(options) + ' ' + path, callback);
+}
+
+/**
+ * Convert an options object to a string.
+ */
+
+function optionString(options) {
+    return Object.keys(options).map(function (key) {
+        var value = options[key];
+        if (value === null) {
+            return '-' + key;
+        } else if (typeof value === 'number') {
+            value += '';
+        } else if (typeof value === 'string') {
+            value = '"' + value.replace(/"/g, '\\"') + '"';
+        }
+        return '-' + key + '=' + value.replace(/`/g, '');
+    }).join(' ');
+}
+
+/**
+ * Get a random 32 byte string.
+ */
+
+function randomString() {
+    var str = '', length = 32;
+    while (length--) {
+        str += String.fromCharCode(Math.random() * 26 | 97);
+    }
+    return str;
+}
 
