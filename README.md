@@ -2,7 +2,7 @@
 
 ## Installation
 
-Requires that [jpegmini](http://www.jpegmini.com) and [exiftool](http://owl.phy.queensu.ca/~phil/exiftool/) are available in `PATH`
+[jpegmini](http://www.jpegmini.com) and [exiftool](http://owl.phy.queensu.ca/~phil/exiftool/) must be installed and available in `PATH`
 
 ```bash
 $ npm install jpegmini
@@ -10,11 +10,19 @@ $ npm install jpegmini
 
 ## Usage
 
-Compress an image
+High-level API
 
 ```javascript
 var jpegmini = require('jpegmini');
 
+jpegmini.optimise('/path/to/image.jpg', function (err) {
+    //...
+});
+```
+
+Low-level API
+
+```javascript
 jpegmini.process({
     input: '/path/to/input.jpg'
   , output: '/path/to/output.jpg'
@@ -23,7 +31,7 @@ jpegmini.process({
   , remove_metadata: false
   , license_cache: '/var/tmp/jpegmini_cache'
 }, function (err) {
-    //..
+    //...
 });
 ```
 
