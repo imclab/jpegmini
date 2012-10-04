@@ -42,16 +42,11 @@ jpegmini.optimise = function (path, options, callback) {
             if (err) {
                 return callback(err);
             }
-            jpegmini.setOptimisedFlag(options.output, function (err) {
+            fs.rename(options.output, path, function (err) {
                 if (err) {
                     return callback(err);
                 }
-                fs.rename(options.output, path, function (err) {
-                    if (err) {
-                        return callback(err);
-                    }
-                    callback(null, true);
-                });
+                callback(null, true);
             });
         });
     });
@@ -135,23 +130,12 @@ jpegmini.logout = function (cache_path, callback) {
  */
 
 jpegmini.getOptimisedFlag = function (path, callback) {
-    jpegmini.exiftool({ 'comment': null }, path, function (err, comment) {
+    jpegmini.exiftool({ comment: null }, path, function (err, comment) {
         if (err) {
             return callback(err);
         }
         callback(null, (comment || '').toLowerCase().indexOf('jpegmini') !== -1);
     });
-};
-
-/**
- * Set the optimisation flag.
- *
- * @param {String} path
- * @param {Function} callback
- */
-
-jpegmini.setOptimisedFlag = function (path, callback) {
-    jpegmini.exiftool({ 'comment': 'Optimized by JPEGmini' }, path, callback);
 };
 
 /**
