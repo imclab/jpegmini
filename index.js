@@ -44,6 +44,12 @@ jpegmini.optimise = function (path, options, callback) {
             }
             fs.rename(options.output, path, function (err) {
                 if (err) {
+                    if (err.code === 'EXDEV') {
+                        return copyFile(options.output, path, function (err) {
+                            fs.unlink(options.output, function () {});
+                            callback(err);
+                        });
+                    }
                     return callback(err);
                 }
                 callback(null, true);
@@ -214,4 +220,24 @@ jpegmini.exec = function () {
     pending++;
     jpegmini_exec.apply(this, args);
 };
+
+/**
+ * Copy a file.
+ */
+
+function copyFile(source, target, callback) {
+    var reader = fs.createReadStream(source)
+      , writer = fs.createWriteStream(target)
+      , done = false;
+    reader.on('error', oncomplete);
+    writer.on('error', oncomplete);
+    writer.on('close', oncomplete);
+    reader.pipe(writer);
+    function oncomplete(err) {
+        if (!done) {
+            callback(err);
+            done = true;
+        }
+    }
+}
 
