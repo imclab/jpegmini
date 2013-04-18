@@ -198,27 +198,28 @@ function randomString() {
 var queued = [], pending = 0
   , jpegmini_exec = jpegmini.exec;
 
+jpegmini.tick = typeof setImmediate !== 'undefined' ? setImmediate : process.nextTick;
+
 jpegmini.exec = function () {
     var args = Array.prototype.slice.call(arguments)
-      , scope = this;
-    if (pending >= jpegmini.concurrency) {
-        return queued.push({ args: args, scope: scope });
-    }
-    var callback = args.pop();
+      , callback = args.pop();
     args.push(function () {
-        var args = Array.prototype.slice.call(arguments);
-        process.nextTick(function () {
-            callback.apply(this, args);
+        var callback_args = Array.prototype.slice.call(arguments);
+        jpegmini.tick(function () {
+            callback.apply(null, callback_args);
             pending--;
             while (pending < jpegmini.concurrency && queued.length) {
                 var next = queued.shift();
                 pending++;
-                jpegmini_exec.apply(next.scope, next.args);
+                jpegmini_exec.apply(jpegmini, next);
             }
         });
     });
+    if (pending >= jpegmini.concurrency) {
+        return queued.push(args);
+    }
     pending++;
-    jpegmini_exec.apply(this, args);
+    jpegmini_exec.apply(jpegmini, args);
 };
 
 /**
